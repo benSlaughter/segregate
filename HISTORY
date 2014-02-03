@@ -1,0 +1,10 @@
+# History
+## Released Versions
+### Version 0.1.0
+#### Minor: Inital code
+##### Added
+ * Inital code
+ * Http header parsers
+ * Http body parsing
+ * Rspec tests
+ * Gem files
