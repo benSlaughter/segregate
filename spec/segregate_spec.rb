@@ -61,6 +61,24 @@ describe Segregate do
         it 'returns a request line' do
           expect(@parser.request_line).to match Segregate::REQUEST_LINE
         end
+
+        it 'returns a modified method request line' do
+          @parser.request_method = 'POST'
+          expect(@parser.request_line).to match Segregate::REQUEST_LINE
+          expect(@parser.request_line).to eq "POST /endpoint HTTP/1.1"
+        end
+
+        it 'returns a modified path request line' do
+          @parser.path = "/new/endpoint"
+          expect(@parser.request_line).to match Segregate::REQUEST_LINE
+          expect(@parser.request_line).to eq "GET /new/endpoint HTTP/1.1"
+        end
+
+        it 'returns a modified http version request line' do
+          @parser.http_version = [2,3]
+          expect(@parser.request_line).to match Segregate::REQUEST_LINE
+          expect(@parser.request_line).to eq "GET /endpoint HTTP/2.3"
+        end
       end
 
       describe '#status_line' do
@@ -185,6 +203,24 @@ describe Segregate do
 
         it 'returns a status line' do
           expect(@parser.status_line).to match Segregate::STATUS_LINE
+        end
+
+        it 'returns a modified http version status line' do
+          @parser.http_version = [2,3]
+          expect(@parser.status_line).to match Segregate::STATUS_LINE
+          expect(@parser.status_line).to eq "HTTP/2.3 200 OK"
+        end
+
+        it 'returns a modified status code status line' do
+          @parser.status_code = 404
+          expect(@parser.status_line).to match Segregate::STATUS_LINE
+          expect(@parser.status_line).to eq "HTTP/1.1 404 OK"
+        end
+
+        it 'returns a modified status phrase status line' do
+          @parser.status_phrase = 'NOT_OK'
+          expect(@parser.status_line).to match Segregate::STATUS_LINE
+          expect(@parser.status_line).to eq "HTTP/1.1 200 NOT_OK"
         end
       end
 
@@ -312,6 +348,12 @@ describe Segregate do
           expect(@parser.headers.accept).to eq 'application/json'
           expect(@parser.headers.host).to eq 'www.google.com'
         end
+
+        it 'contains modified headers' do
+          @parser.headers.host = 'www.yahoo.com'
+          expect(@parser.headers).to respond_to(:host)
+          expect(@parser.headers.host).to eq 'www.yahoo.com'
+        end
       end
 
       describe '#headers_complete?' do
@@ -336,13 +378,22 @@ describe Segregate do
         end
 
         it 'contains the body text' do
-          expect(@parser.body).to eq "This is the content!"
+          expect(@parser.body).to eq 'This is the content!'
         end
       end
 
       describe '#body_complete?' do
         it 'returns true' do
           expect(@parser.body_complete?).to be_an_instance_of TrueClass
+        end
+      end
+
+      describe '#update_content_length' do
+        it 'updates the content lenght header' do
+          expect(@parser.headers['content-length']).to eq '20'
+          @parser.body = 'new content'
+          @parser.update_content_length
+          expect(@parser.headers['content-length']).to eq '11'
         end
       end
     end
@@ -362,13 +413,19 @@ describe Segregate do
         end
 
         it 'contains the body text' do
-          expect(@parser.body).to eq "This is the first content!"
+          expect(@parser.body).to eq 'This is the first content!'
         end
       end
 
       describe '#body_complete?' do
         it 'returns false' do
           expect(@parser.body_complete?).to be_an_instance_of FalseClass
+        end
+      end
+
+      describe '#update_content_length' do
+        it 'raises an error if the body is not complete' do
+          expect{ @parser.update_content_length }.to raise_error RuntimeError, 'ERROR: parsing message body not complete'
         end
       end
 
@@ -384,13 +441,29 @@ describe Segregate do
           end
 
           it 'contains the body text' do
-            expect(@parser.body).to eq "This is the first content!This is the second content!"
+            expect(@parser.body).to eq 'This is the first content!This is the second content!'
+          end
+
+          it 'contains the modified body' do
+            @parser.body.sub!('first', 'third')
+            expect(@parser.body).to eq 'This is the third content!This is the second content!'
           end
         end
 
         describe '#body_complete?' do
           it 'returns true' do
             expect(@parser.body_complete?).to be_an_instance_of TrueClass
+          end
+        end
+
+        describe '#update_content_length' do
+          it 'updates the content lenght header' do
+            expect(@parser.headers['content-length']).to be_nil
+            expect(@parser.headers['content-encoding']).to eq 'chunked'
+            @parser.body = 'new content'
+            @parser.update_content_length
+            expect(@parser.headers['content-length']).to eq '11'
+            expect(@parser.headers['content-encoding']).to be_nil
           end
         end
       end

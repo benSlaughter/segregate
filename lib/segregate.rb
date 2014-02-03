@@ -4,7 +4,8 @@ require 'segregate/http_methods'
 require 'segregate/http_regular_expressions'
 
 class Segregate
-  attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version, :headers, :body
+  attr_reader :uri
+  attr_accessor :request_method, :status_code, :status_phrase, :http_version, :headers, :body
 
   def method_missing meth, *args, &block
     if @uri.respond_to? meth
@@ -36,7 +37,7 @@ class Segregate
     @first_line_complete = false
     @headers_complete = false
     @body_complete = false
-    @header_order = []
+    @header_orders = []
   end
 
   def request?
@@ -73,6 +74,17 @@ class Segregate
 
   def minor_http_version
     http_version[1]
+  end
+
+  def update_content_length
+    if @body_complete
+      @headers['content-length'] = @body.length.to_s
+      @header_orders.push 'content-length' unless @header_orders.include? 'content-length'
+      @headers.delete 'content-encoding'
+      @header_orders.delete 'content-encoding'
+    else
+      raise "ERROR: parsing message body not complete"
+    end
   end
 
   def parse data
@@ -138,7 +150,7 @@ class Segregate
       else
         key, value = line.split(":")
         @headers[key.downcase] = value.strip
-        @header_order << key.downcase
+        @header_orders << key.downcase
       end
     end
 
