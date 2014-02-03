@@ -396,6 +396,12 @@ describe Segregate do
           expect(@parser.headers['content-length']).to eq '11'
         end
       end
+
+      describe '#raw_data' do
+        it 'returns the raw message' do
+          expect(@parser.raw_data).to eq "GET /endpoint HTTP/1.1\r\nhost: www.google.com\r\ncontent-length: 20\r\n\r\nThis is the content!\r\n\r\n"
+        end
+      end
     end
 
     context 'a partial chunked body has been parsed' do
@@ -426,6 +432,12 @@ describe Segregate do
       describe '#update_content_length' do
         it 'raises an error if the body is not complete' do
           expect{ @parser.update_content_length }.to raise_error RuntimeError, 'ERROR: parsing message body not complete'
+        end
+      end
+
+      describe '#raw_data' do
+        it 'raises an error if the body is not complete' do
+          expect{ @parser.raw_data }.to raise_error RuntimeError, 'ERROR: parsing message body not complete'
         end
       end
 
@@ -464,6 +476,12 @@ describe Segregate do
             @parser.update_content_length
             expect(@parser.headers['content-length']).to eq '11'
             expect(@parser.headers['content-encoding']).to be_nil
+          end
+        end
+
+        describe '#raw_data' do
+          it 'returns the raw message' do
+            expect(@parser.raw_data).to eq "GET /endpoint HTTP/1.1\r\nhost: www.google.com\r\ncontent-length: 53\r\n\r\nThis is the first content!This is the second content!\r\n\r\n"
           end
         end
       end

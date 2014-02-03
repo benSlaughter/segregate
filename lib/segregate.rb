@@ -87,6 +87,30 @@ class Segregate
     end
   end
 
+  def raw_data
+    raw_message = ""
+
+    if @body_complete
+      update_content_length
+      
+      request? ? raw_message << request_line : raw_message << status_line
+      raw_message << "\r\n"
+
+      @header_orders.each do |header|
+        raw_message << "%s: %s\r\n" % [header, headers[header]]
+      end
+      raw_message << "\r\n"
+
+      raw_message << @body + "\r\n"
+      raw_message << "\r\n"
+
+    else
+      raise "ERROR: parsing message body not complete"
+    end
+
+    raw_message
+  end
+
   def parse data
     raise "ERROR: parsing completed" if @body_complete
 
