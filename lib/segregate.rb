@@ -18,7 +18,9 @@ class Segregate
     @uri.respond_to?(meth, include_private) || super
   end
 
-  def initialize
+  def initialize callback = nil
+    @callback = callback
+
     @uri = nil
     @request_method = nil
     @status_code = nil
@@ -94,6 +96,7 @@ class Segregate
   end
 
   def read_first_line data
+    @callback.on_message_begin self if @callback.respond_to?(:on_message_begin)
     line = read data
 
     if line =~ REQUEST_LINE
@@ -114,6 +117,8 @@ class Segregate
     @request_method, url, @http_version[0], @http_version[1] = line.scan(REQUEST_LINE).flatten
     @http_version.map! {|v| v.to_i}
     @uri = URI.parse url
+
+    @callback.on_request_line self if @callback.respond_to?(:on_request_line)
   end
 
   def parse_status_line line
@@ -121,6 +126,8 @@ class Segregate
     @http_version[0], @http_version[1], code, @status_phrase = line.scan(STATUS_LINE).flatten
     @http_version.map! {|v| v.to_i}
     @status_code = code.to_i
+
+    @callback.on_status_line self if @callback.respond_to?(:on_status_line)
   end
 
   def read_headers data
@@ -134,6 +141,8 @@ class Segregate
         @header_order << key.downcase
       end
     end
+
+    @callback.on_headers_complete self if @callback.respond_to?(:on_headers_complete) && @headers_complete
   end
 
   def read_body data
@@ -142,6 +151,8 @@ class Segregate
     elsif headers['content-encoding'] == 'chunked'
       parse_chunked_data data
     end
+
+    @callback.on_body_complete self if @callback.respond_to?(:on_body_complete) && @body_complete
   end
 
   def parse_body data

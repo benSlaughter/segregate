@@ -396,4 +396,49 @@ describe Segregate do
       end
     end
   end
+
+  context 'a new parser has been created with a callback object' do
+    before(:each) do
+      @callback_object = double
+      @parser = Segregate.new @callback_object
+    end
+
+    describe 'on_message_begin' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_message_begin).with(@parser)
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+      end
+    end
+
+    describe 'on_request' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_request_line).with(@parser)
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+      end
+    end
+
+    describe 'on_response' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_status_line).with(@parser)
+        @parser.parse "HTTP/1.1 200 OK\r\n"
+      end
+    end
+
+    describe 'on_headers_complete' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_headers_complete).with(@parser)
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Host: www.google.com\r\n\r\n"
+      end
+    end
+
+    describe 'on_body_complete' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_body_complete).with(@parser)
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Content-Length: 8\r\n\r\n"
+        @parser.parse "TestData\r\n\r\n"
+      end
+    end
+  end
 end
