@@ -4,7 +4,7 @@ require 'segregate/http_methods'
 require 'segregate/http_regular_expressions'
 
 class Segregate
-  attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version, :headers
+  attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version, :headers, :body
 
   def method_missing meth, *args, &block
     if @uri.respond_to? meth
@@ -26,6 +26,7 @@ class Segregate
     @http_version = [nil, nil]
 
     @headers = Hashie::Mash.new
+    @body = ""
 
     @request = false
     @response = false
@@ -33,6 +34,7 @@ class Segregate
     @first_line_complete = false
     @headers_complete = false
     @body_complete = false
+    @header_order = []
   end
 
   def request?
@@ -45,6 +47,10 @@ class Segregate
 
   def headers_complete?
     @headers_complete
+  end
+
+  def body_complete?
+    @body_complete
   end
 
   def request_line
@@ -79,8 +85,12 @@ class Segregate
 
   private
 
-  def read data
-    data.readline.chomp("\r\n")
+  def read data, size = nil
+    if size
+      data.read(size + 2).chomp("\r\n")
+    else
+      data.readline.chomp("\r\n")
+    end
   end
 
   def read_first_line data
@@ -121,10 +131,32 @@ class Segregate
       else
         key, value = line.split(":")
         @headers[key.downcase] = value.strip
+        @header_order << key.downcase
       end
     end
   end
 
   def read_body data
+    if headers.key? 'content-length'
+      parse_body data
+    elsif headers['content-encoding'] == 'chunked'
+      parse_chunked_data data
+    end
+  end
+
+  def parse_body data
+    @body = read data, headers['content-length'].to_i
+    @body_complete = true
+  end
+
+  def parse_chunked_data data
+    while !data.eof? && !@body_complete
+      chunk_size = read(data).to_i
+      if chunk_size == 0
+        @body_complete = true
+      else
+        @body << read(data, chunk_size)
+      end
+    end
   end
 end

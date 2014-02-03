@@ -24,6 +24,8 @@ describe Segregate do
       expect(@parser.http_version).to eq [nil, nil]
       expect(@parser.major_http_version).to be_nil
       expect(@parser.minor_http_version).to be_nil
+      expect(@parser.headers).to be_empty
+      expect(@parser.body).to be_empty
     end
   end
 
@@ -304,6 +306,81 @@ describe Segregate do
       describe '#headers_complete?' do
         it 'returns true' do
           expect(@parser.headers_complete?).to be_an_instance_of TrueClass
+        end
+      end
+    end
+
+    context 'a body has been parsed' do
+      before(:each) do
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Host: www.google.com\r\n"
+        @parser.parse "Content-Length: 20\r\n"
+        @parser.parse "\r\n"
+        @parser.parse "This is the content!\r\n\r\n"
+      end
+
+      describe '#body' do
+        it 'returns a string' do
+          expect(@parser.body).to be_an_instance_of String
+        end
+
+        it 'contains the body text' do
+          expect(@parser.body).to eq "This is the content!"
+        end
+      end
+
+      describe '#body_complete?' do
+        it 'returns true' do
+          expect(@parser.body_complete?).to be_an_instance_of TrueClass
+        end
+      end
+    end
+
+    context 'a partial chunked body has been parsed' do
+      before(:each) do
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Host: www.google.com\r\n"
+        @parser.parse "Content-Encoding: chunked\r\n"
+        @parser.parse "\r\n"
+        @parser.parse "26\r\nThis is the first content!\r\n"
+      end
+
+      describe '#body' do
+        it 'returns a string' do
+          expect(@parser.body).to be_an_instance_of String
+        end
+
+        it 'contains the body text' do
+          expect(@parser.body).to eq "This is the first content!"
+        end
+      end
+
+      describe '#body_complete?' do
+        it 'returns false' do
+          expect(@parser.body_complete?).to be_an_instance_of FalseClass
+        end
+      end
+
+      context 'the body parsing is completed' do
+        before(:each) do
+          @parser.parse "27\r\nThis is the second content!\r\n"
+          @parser.parse "0\r\n\r\n"
+        end
+
+        describe '#body' do
+          it 'returns a string' do
+            expect(@parser.body).to be_an_instance_of String
+          end
+
+          it 'contains the body text' do
+            expect(@parser.body).to eq "This is the first content!This is the second content!"
+          end
+        end
+
+        describe '#body_complete?' do
+          it 'returns true' do
+            expect(@parser.body_complete?).to be_an_instance_of TrueClass
+          end
         end
       end
     end
