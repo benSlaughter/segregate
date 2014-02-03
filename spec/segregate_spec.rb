@@ -79,6 +79,18 @@ describe Segregate do
           expect(@parser.request_line).to match Segregate::REQUEST_LINE
           expect(@parser.request_line).to eq "GET /endpoint HTTP/2.3"
         end
+
+        it 'returns a modified major http version request line' do
+          @parser.major_http_version = 2
+          expect(@parser.request_line).to match Segregate::REQUEST_LINE
+          expect(@parser.request_line).to eq "GET /endpoint HTTP/2.1"
+        end
+
+        it 'returns a modified minor http version request line' do
+          @parser.minor_http_version = 2
+          expect(@parser.request_line).to match Segregate::REQUEST_LINE
+          expect(@parser.request_line).to eq "GET /endpoint HTTP/1.2"
+        end
       end
 
       describe '#status_line' do
