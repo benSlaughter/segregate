@@ -33,7 +33,7 @@ Require Segregate at the start of your code
 require 'segregate'
 ```
 
-### Basic useage
+### Basic usage
 #### Parsing data:
 
 ```ruby
@@ -81,7 +81,7 @@ parser.headers['accept'] = "application/json"
 parser.body.sub! "data", "information"
 ```
 
-### Callback useage
+### Callback usage
 
 ```Ruby
 class Callback_object
