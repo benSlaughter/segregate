@@ -154,6 +154,13 @@ describe Segregate do
           expect(@parser.path).to eq '/endpoint'
         end
       end
+
+      describe '#respond_to?' do
+        it 'responds to the uri path' do
+          expect(@parser.respond_to? :uri).to be_true
+          expect(@parser.respond_to? :path).to be_true
+        end
+      end
     end
 
     context 'a response line has been parsed' do
