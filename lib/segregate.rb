@@ -15,7 +15,7 @@ class Segregate
   end
 
   def respond_to?(meth, include_private = false)
-    @uri.respond_to?(meth) || super
+    @uri.respond_to?(meth, include_private) || super
   end
 
   def initialize

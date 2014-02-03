@@ -40,11 +40,11 @@ describe Segregate do
       end
 
       it 'errors if an incorrect first line is received' do
-        expect{@parser.parse "fail\r\n"}.to raise_error RuntimeError, 'ERROR: Unknown first line: fail'
+        expect{ @parser.parse "fail\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown first line: fail'
       end
 
       it 'errors if an incorrect http method is received' do
-        expect{@parser.parse "FAIL /endpoint HTTP/1.1\r\n"}.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
+        expect{ @parser.parse "FAIL /endpoint HTTP/1.1\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
       end
     end
 
@@ -149,9 +149,13 @@ describe Segregate do
         end
       end
 
-      describe '#path' do
-        it 'returns the uri path' do
+      describe '#method_missing' do
+        it 'returns the uri methods' do
           expect(@parser.path).to eq '/endpoint'
+        end
+
+        it 'raises an error if uri does not respond to the method' do
+          expect{ @parser.not_present }.to raise_error NoMethodError, /undefined method `not_present'/
         end
       end
 
