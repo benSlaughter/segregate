@@ -5,6 +5,18 @@ require 'segregate/http_regular_expressions'
 class Segregate
   attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version
 
+  def method_missing meth, *args, **kwargs, &block
+    if @uri.respond_to? meth
+      @uri.call(sym, *args, **kwargs, &block)
+    else
+      super
+    end
+  end
+
+  def respond_to?(meth, include_private = false)
+    @uri.respond_to?(meth) || super
+  end
+
   def initialize
     @uri = nil
     @request_method = nil
