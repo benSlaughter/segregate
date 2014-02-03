@@ -1,5 +1,15 @@
 # History
 ## Released Versions
+### Version 0.3.0
+#### Minor: Raw data
+##### Added
+ * raw_data method
+ * on_body callback
+ * Modify http major/minor version
+
+##### Updated
+ * Readme
+
 ### Version 0.2.0
 #### Minor: Object callback
 ##### Added

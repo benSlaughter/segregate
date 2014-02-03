@@ -67,8 +67,16 @@ class Segregate
     http_version[0]
   end
 
+  def major_http_version= val
+    http_version[0] = val
+  end
+
   def minor_http_version
     http_version[1]
+  end
+
+  def minor_http_version= val
+    http_version[1] = val
   end
 
   def update_content_length
@@ -177,6 +185,7 @@ class Segregate
 
   def parse_body data
     @body = read data, headers['content-length'].to_i
+    @callback.on_body @body if @callback.respond_to?(:on_body)
     @body_complete = true
   end
 
@@ -186,7 +195,9 @@ class Segregate
       if chunk_size == 0
         @body_complete = true
       else
-        @body << read(data, chunk_size)
+        chunk = read(data, chunk_size)
+        @body << chunk
+        @callback.on_body chunk if @callback.respond_to?(:on_body)
       end
     end
   end

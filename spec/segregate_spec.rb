@@ -523,6 +523,15 @@ describe Segregate do
       end
     end
 
+    describe 'on_body' do
+      it 'calls the callback object' do
+        @callback_object.should_receive(:on_body).with("TestData")
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Content-Length: 8\r\n\r\n"
+        @parser.parse "TestData\r\n\r\n"
+      end
+    end
+
     describe 'on_body_complete' do
       it 'calls the callback object' do
         @callback_object.should_receive(:on_body_complete).with(@parser)
