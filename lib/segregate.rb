@@ -68,18 +68,10 @@ class Segregate
     line = read data
 
     if line =~ REQUEST_LINE
-      @request = true
-      @request_method, url, @http_version[0], @http_version[1] = line.scan(REQUEST_LINE).flatten
-      
-      @http_version.map! {|v| v.to_i}
-      @uri = URI.parse url
+      parse_request_line line
 
     elsif line =~ STATUS_LINE
-      @response = true
-      @http_version[0], @http_version[1], code, @status_phrase = line.scan(STATUS_LINE).flatten
-
-      @http_version.map! {|v| v.to_i}
-      @status_code = code.to_i
+      parse_status_line line
 
     elsif line =~ UNKNOWN_REQUEST_LINE
       raise "ERROR: Unknown http method: %s" % line[/^\S+/]
@@ -90,6 +82,20 @@ class Segregate
     end
 
     @first_line_complete = true
+  end
+
+  def parse_request_line line
+    @request = true
+    @request_method, url, @http_version[0], @http_version[1] = line.scan(REQUEST_LINE).flatten
+    @http_version.map! {|v| v.to_i}
+    @uri = URI.parse url
+  end
+
+  def parse_status_line line
+    @response = true
+    @http_version[0], @http_version[1], code, @status_phrase = line.scan(STATUS_LINE).flatten
+    @http_version.map! {|v| v.to_i}
+    @status_code = code.to_i
   end
 
   def read_headers data
