@@ -19,13 +19,8 @@ class Segregate
     @uri.respond_to?(meth, include_private) || super
   end
 
-  def initialize callback = nil
+  def initialize callback = nil 
     @callback = callback
-
-    @uri = nil
-    @request_method = nil
-    @status_code = nil
-    @status_phrase = nil
     @http_version = [nil, nil]
 
     @headers = Hashie::Mash.new
@@ -96,9 +91,8 @@ class Segregate
     @header_orders.each do |header|
       raw_message << "%s: %s\r\n" % [header, headers[header]]
     end
-    raw_message << "\r\n"
 
-    raw_message << @body + "\r\n\r\n"
+    raw_message << "\r\n" + @body + "\r\n\r\n"
   end
 
   def parse data
