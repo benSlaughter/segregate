@@ -1,13 +1,14 @@
 require 'uri'
+require 'hashie'
 require 'segregate/http_methods'
 require 'segregate/http_regular_expressions'
 
 class Segregate
-  attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version
+  attr_reader :uri, :request_method, :status_code, :status_phrase, :http_version, :headers
 
-  def method_missing meth, *args, **kwargs, &block
+  def method_missing meth, *args, &block
     if @uri.respond_to? meth
-      @uri.call(sym, *args, **kwargs, &block)
+      @uri.send meth, *args, &block
     else
       super
     end
@@ -24,6 +25,8 @@ class Segregate
     @status_phrase = nil
     @http_version = [nil, nil]
 
+    @headers = Hashie::Mash.new
+
     @request = false
     @response = false
 
@@ -38,6 +41,10 @@ class Segregate
 
   def response?
     @response
+  end
+
+  def headers_complete?
+    @headers_complete
   end
 
   def request_line
@@ -81,16 +88,12 @@ class Segregate
 
     if line =~ REQUEST_LINE
       parse_request_line line
-
     elsif line =~ STATUS_LINE
       parse_status_line line
-
     elsif line =~ UNKNOWN_REQUEST_LINE
       raise "ERROR: Unknown http method: %s" % line[/^\S+/]
-
     else
       raise "ERROR: Unknown first line: %s" % line
-
     end
 
     @first_line_complete = true
@@ -111,6 +114,15 @@ class Segregate
   end
 
   def read_headers data
+    while !data.eof? && !@headers_complete
+      line = read data
+      if line.empty?
+        @headers_complete = true
+      else
+        key, value = line.split(":")
+        @headers[key.downcase] = value.strip
+      end
+    end
   end
 
   def read_body data

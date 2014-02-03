@@ -38,11 +38,11 @@ describe Segregate do
       end
 
       it 'errors if an incorrect first line is received' do
-        expect{@parser.parse "fail\r\n"}.to raise_error RuntimeError, "ERROR: Unknown first line: fail" 
+        expect{@parser.parse "fail\r\n"}.to raise_error RuntimeError, 'ERROR: Unknown first line: fail'
       end
 
       it 'errors if an incorrect http method is received' do
-        expect{@parser.parse "FAIL /endpoint HTTP/1.1\r\n"}.to raise_error RuntimeError, "ERROR: Unknown http method: FAIL" 
+        expect{@parser.parse "FAIL /endpoint HTTP/1.1\r\n"}.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
       end
     end
 
@@ -68,22 +68,14 @@ describe Segregate do
       end
 
       describe '#request?' do
-        it 'returns a bool' do
-          expect(@parser.request?).to be_an_instance_of TrueClass
-        end
-
         it 'returns true' do
-          expect(@parser.request?).to be_true
+          expect(@parser.request?).to be_an_instance_of TrueClass
         end
       end
 
       describe '#response?' do
-        it 'returns a bool' do
-          expect(@parser.response?).to be_an_instance_of FalseClass
-        end
-
         it 'returns false' do
-          expect(@parser.response?).to be_false
+          expect(@parser.response?).to be_an_instance_of FalseClass
         end
       end
 
@@ -154,6 +146,12 @@ describe Segregate do
           expect(@parser.uri).to be_an_instance_of URI::Generic
         end
       end
+
+      describe '#path' do
+        it 'returns the uri path' do
+          expect(@parser.path).to eq '/endpoint'
+        end
+      end
     end
 
     context 'a response line has been parsed' do
@@ -178,22 +176,14 @@ describe Segregate do
       end
 
       describe '#request?' do
-        it 'returns a bool' do
-          expect(@parser.request?).to be_an_instance_of FalseClass
-        end
-
         it 'returns false' do
-          expect(@parser.request?).to be_false
+          expect(@parser.request?).to be_an_instance_of FalseClass
         end
       end
 
       describe '#response?' do
-        it 'returns a bool' do
-          expect(@parser.response?).to be_an_instance_of TrueClass
-        end
-
         it 'returns true' do
-          expect(@parser.response?).to be_true
+          expect(@parser.response?).to be_an_instance_of TrueClass
         end
       end
 
@@ -262,6 +252,58 @@ describe Segregate do
       describe '#uri' do
         it 'returns nil' do
           expect(@parser.uri).to be_nil
+        end
+      end
+    end
+
+    context 'a header has been parsed' do
+      before(:each) do
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Accept: application/json\r\n"
+      end
+
+      describe '#headers' do
+        it 'returns an instans of a hashie mash' do
+          expect(@parser.headers).to be_an_instance_of Hashie::Mash
+        end
+
+        it 'contains the parsed header' do
+          expect(@parser.headers).to respond_to(:accept)
+          expect(@parser.headers.accept).to eq 'application/json'
+        end
+      end
+
+      describe '#headers_complete?' do
+        it 'returns false' do
+          expect(@parser.headers_complete?).to be_an_instance_of FalseClass
+        end
+      end
+    end
+
+    context 'all headers have been parsed' do
+      before(:each) do
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "Accept: application/json\r\n"
+        @parser.parse "Host: www.google.com\r\n"
+        @parser.parse "\r\n"
+      end
+
+      describe '#headers' do
+        it 'returns an instans of a hashie mash' do
+          expect(@parser.headers).to be_an_instance_of Hashie::Mash
+        end
+
+        it 'contains all the parsed headers' do
+          expect(@parser.headers).to respond_to(:accept)
+          expect(@parser.headers).to respond_to(:host)
+          expect(@parser.headers.accept).to eq 'application/json'
+          expect(@parser.headers.host).to eq 'www.google.com'
+        end
+      end
+
+      describe '#headers_complete?' do
+        it 'returns true' do
+          expect(@parser.headers_complete?).to be_an_instance_of TrueClass
         end
       end
     end
