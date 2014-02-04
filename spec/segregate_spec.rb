@@ -38,14 +38,6 @@ describe Segregate do
       it 'accepts one argument' do
         expect(@parser).to respond_to(:parse).with(1).argument
       end
-
-      it 'errors if an incorrect first line is received' do
-        expect{ @parser.parse "fail\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown first line: fail'
-      end
-
-      it 'errors if an incorrect http method is received' do
-        expect{ @parser.parse "FAIL /endpoint HTTP/1.1\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
-      end
     end
 
     context 'a request line has been parsed' do
@@ -182,10 +174,6 @@ describe Segregate do
       describe '#method_missing' do
         it 'returns the uri methods' do
           expect(@parser.path).to eq '/endpoint'
-        end
-
-        it 'raises an error if uri does not respond to the method' do
-          expect{ @parser.not_present }.to raise_error NoMethodError, /undefined method `not_present'/
         end
       end
 
@@ -438,18 +426,6 @@ describe Segregate do
       describe '#body_complete?' do
         it 'returns false' do
           expect(@parser.body_complete?).to be_an_instance_of FalseClass
-        end
-      end
-
-      describe '#update_content_length' do
-        it 'raises an error if the body is not complete' do
-          expect{ @parser.update_content_length }.to raise_error RuntimeError, 'ERROR: parsing message body not complete'
-        end
-      end
-
-      describe '#raw_data' do
-        it 'raises an error if the body is not complete' do
-          expect{ @parser.raw_data }.to raise_error RuntimeError, 'ERROR: parsing message body not complete'
         end
       end
 

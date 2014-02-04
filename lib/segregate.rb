@@ -85,8 +85,6 @@ class Segregate
       @header_orders.push 'content-length' unless @header_orders.include? 'content-length'
       @headers.delete 'content-encoding'
       @header_orders.delete 'content-encoding'
-    else
-      raise "ERROR: parsing message body not complete"
     end
   end
 
@@ -104,8 +102,6 @@ class Segregate
   end
 
   def parse data
-    raise "ERROR: parsing completed" if @body_complete
-
     data = StringIO.new data
 
     read_first_line data unless @first_line_complete
@@ -131,10 +127,6 @@ class Segregate
       parse_request_line line
     elsif line =~ STATUS_LINE
       parse_status_line line
-    elsif line =~ UNKNOWN_REQUEST_LINE
-      raise "ERROR: Unknown http method: %s" % line[/^\S+/]
-    else
-      raise "ERROR: Unknown first line: %s" % line
     end
 
     @first_line_complete = true
