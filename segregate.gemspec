@@ -26,4 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rspec'
 
   spec.add_runtime_dependency 'hashie'
+  spec.add_runtime_dependency 'juncture'
 end

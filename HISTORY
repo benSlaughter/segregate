@@ -1,5 +1,20 @@
 # History
 ## Released Versions
+### Version 0.5.0
+#### Minor: parse_data
+##### Added
+ * Juncture gem for managing state
+ * done method for when completed
+
+##### Updated
+ * parse and changed to parse_data
+ * test have been updated and overhauled
+ * parsing data can now accept partial data
+ * state and type managment
+
+##### Removed
+ * body_complete method in favour of done
+
 ### Version 0.4.0
 #### Minor: Raw data
 ##### Added

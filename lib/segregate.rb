@@ -1,11 +1,14 @@
-require 'uri'
+require 'juncture'
 require 'hashie'
+require 'uri'
+require 'segregate/version'
 require 'segregate/http_methods'
+require 'segregate/http_headers'
 require 'segregate/http_regular_expressions'
 
 class Segregate
-  attr_reader :uri
-  attr_accessor :request_method, :status_code, :status_phrase, :http_version, :headers, :body
+  attr_reader :uri, :type, :state, :http_version, :headers
+  attr_accessor :request_method, :status_code, :status_phrase, :body
 
   def method_missing meth, *args, &block
     if @uri.respond_to? meth
@@ -23,32 +26,31 @@ class Segregate
     @callback = callback
     @http_version = [nil, nil]
 
+    # :request, :response
+    @type = Juncture.new :request, :response
+    @state = Juncture.new :waiting, :headers, :body, :done, default: :waiting
+
     @headers = Hashie::Mash.new
     @body = ""
 
-    @request = false
-    @response = false
-
-    @first_line_complete = false
-    @headers_complete = false
-    @body_complete = false
-    @header_orders = []
+    @stashed_data = ""
+    @stashed_body = ""
   end
 
   def request?
-    @request
+    @type == :request
   end
 
   def response?
-    @response
+    @type == :response
   end
 
   def headers_complete?
-    @headers_complete
+    @state > :headers
   end
 
-  def body_complete?
-    @body_complete
+  def done?
+    @state >= :done
   end
 
   def request_line
@@ -67,24 +69,22 @@ class Segregate
     http_version[0]
   end
 
-  def major_http_version= val
-    http_version[0] = val
+  def major_http_version= value
+    http_version[0] = value
   end
 
   def minor_http_version
     http_version[1]
   end
 
-  def minor_http_version= val
-    http_version[1] = val
+  def minor_http_version= value
+    http_version[1] = value
   end
 
   def update_content_length
-    if @body_complete
+    unless @body.empty?
       @headers['content-length'] = @body.size.to_s
-      @header_orders.push 'content-length' unless @header_orders.include? 'content-length'
       @headers.delete 'transfer-encoding' 
-      @header_orders.delete 'transfer-encoding'
     end
   end
 
@@ -93,41 +93,46 @@ class Segregate
     update_content_length
     
     request? ? raw_message << request_line + "\r\n" : raw_message << status_line + "\r\n"
-    @header_orders.each do |header|
-      raw_message << "%s: %s\r\n" % [header, headers[header]]
+    ALL_HEADERS.each do |header|
+      raw_message << "%s: %s\r\n" % [header, headers[header]] if headers[header]
     end
 
-    raw_message << "\r\n" + @body + "\r\n" if @body_complete
+    raw_message << "\r\n" + @body + "\r\n" unless @body.empty?
     raw_message << "\r\n"
   end
 
-  def parse data
-    data = StringIO.new data
+  def parse_data data
+    data = StringIO.new(@stashed_data + data)
+    @stashed_data = ""
 
-    read_first_line data unless @first_line_complete
-    read_headers data unless @headers_complete
-    read_body data unless data.eof?
+    while !data.eof? && @state < :done
+      line, complete_line = get_next_line data
+      complete_line ? parse_line(line) : @stashed_data = line
+    end
+  end
 
-    @callback.on_message_complete self if @callback.respond_to?(:on_message_complete) && message_complete?
+  def parse_line line
+    case @state.state
+    when :waiting
+      read_in_first_line line
+    when :headers
+      read_in_headers line
+    when :body
+      read_in_body line
+    end
+
+    @callback.on_message_complete self if @callback.respond_to?(:on_message_complete) && done?
   end
 
   private
 
-  def message_complete?
-    @body_complete || (@headers_complete && @headers['content-length'].nil? && @headers['transfer-encoding'].nil?)
+  def get_next_line data
+    line = data.readline("\r\n")
+    [line.chomp("\r\n"), line.end_with?("\r\n") || line.length == headers['content-length'].to_i && @state >= :body]
   end
 
-  def read data, size = nil
-    if size
-      data.read(size + 2).chomp("\r\n")
-    else
-      data.readline.chomp("\r\n")
-    end
-  end
-
-  def read_first_line data
+  def read_in_first_line line
     @callback.on_message_begin self if @callback.respond_to?(:on_message_begin)
-    line = read data
 
     if line =~ REQUEST_LINE
       parse_request_line line
@@ -139,11 +144,11 @@ class Segregate
       raise "ERROR: Unknown first line: %s" % line
     end
 
-    @first_line_complete = true
+    @state.next
   end
 
   def parse_request_line line
-    @request = true
+    @type.set :request
     @request_method, url, @http_version[0], @http_version[1] = line.scan(REQUEST_LINE).flatten
     @http_version.map! {|v| v.to_i}
     @uri = URI.parse url
@@ -152,7 +157,7 @@ class Segregate
   end
 
   def parse_status_line line
-    @response = true
+    @type.set :response
     @http_version[0], @http_version[1], code, @status_phrase = line.scan(STATUS_LINE).flatten
     @http_version.map! {|v| v.to_i}
     @status_code = code.to_i
@@ -160,45 +165,73 @@ class Segregate
     @callback.on_status_line self if @callback.respond_to?(:on_status_line)
   end
 
-  def read_headers data
-    while !data.eof? && !@headers_complete
-      line = read data
-      if line.empty?
-        @headers_complete = true
-      else
-        key, value = line.split(":")
-        @headers[key.downcase] = value.strip
-        @header_orders << key.downcase
-      end
+  def read_in_headers line
+    if line.empty?
+      @state.next
+    else
+      key, value = line.split(":")
+      @headers[key.downcase] = value.strip
     end
 
-    @callback.on_headers_complete self if @callback.respond_to?(:on_headers_complete) && @headers_complete
+    if headers_complete?
+      @callback.on_headers_complete self if @callback.respond_to?(:on_headers_complete)
+      unless headers['content-length'] || headers['transfer-encoding']
+        @state.set :done
+      end
+    end
   end
 
-  def read_body data
-    if headers.key? 'content-length'
-      parse_body data
+  def read_in_body line
+    if headers['content-length']
+      parse_body line
     elsif headers['transfer-encoding'] == 'chunked'
-      parse_chunked_data data
+      parse_chunked_data line
     end
   end
 
-  def parse_body data
-    @body = read data, headers['content-length'].to_i
-    @callback.on_body @body if @callback.respond_to?(:on_body)
-    @body_complete = true
+  def parse_body line
+    line = @stashed_body + line
+    @stashed_body = ""
+
+    if line.length == headers['content-length'].to_i
+      @body = line
+      @callback.on_body @body if @callback.respond_to?(:on_body)
+      @state.next
+    else
+      @stashed_body = line
+    end
   end
 
-  def parse_chunked_data data
-    while !data.eof? && !@body_complete
-      chunk_size = read(data).to_i(16)
-      if chunk_size == 0
-        @body_complete = true
-      else
-        chunk = read(data, chunk_size)
-        @body << chunk
-        @callback.on_body chunk if @callback.respond_to?(:on_body)
-      end
+  def parse_chunked_data line
+    @chunked_body_state ||= Juncture.new :size, :chunk, default: :size
+
+    case @chunked_body_state.state
+    when :size
+      parse_chunked_data_size line.to_i(16)
+    when :chunk
+      parse_chunked_data_chunk line
+    end
+  end
+
+  def parse_chunked_data_size chunk_size
+    if chunk_size == 0
+      @state.next
+    else
+      @chunk_size = chunk_size
+    end
+    @chunked_body_state.next
+  end
+
+  def parse_chunked_data_chunk line
+    line = @stashed_body + line
+    @stashed_body = ""
+
+    if line.length == @chunk_size
+      @body << line
+      @callback.on_body line if @callback.respond_to?(:on_body)
+      @chunked_body_state.next
+    else
+      @stashed_body = line
     end
   end
 end
