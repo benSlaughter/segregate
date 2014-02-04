@@ -81,25 +81,24 @@ class Segregate
 
   def update_content_length
     if @body_complete
-      @headers['content-length'] = @body.length.to_s
+      @headers['content-length'] = @body.size.to_s
       @header_orders.push 'content-length' unless @header_orders.include? 'content-length'
-      @headers.delete 'content-encoding'
-      @header_orders.delete 'content-encoding'
+      @headers.delete 'transfer-encoding' 
+      @header_orders.delete 'transfer-encoding'
     end
   end
 
   def raw_data
     raw_message = ""
     update_content_length
-
+    
     request? ? raw_message << request_line + "\r\n" : raw_message << status_line + "\r\n"
-
     @header_orders.each do |header|
       raw_message << "%s: %s\r\n" % [header, headers[header]]
     end
-    raw_message << "\r\n"
 
-    raw_message << @body + "\r\n\r\n" unless @body.empty?
+    raw_message << "\r\n" + @body + "\r\n" if @body_complete
+    raw_message << "\r\n"
   end
 
   def parse data
@@ -109,13 +108,13 @@ class Segregate
     read_headers data unless @headers_complete
     read_body data unless data.eof?
 
-    @callback.on_message_complete self if @callback.respond_to?(:on_message_complete) && @headers_complete && (no_body? || @body_complete)
+    @callback.on_message_complete self if @callback.respond_to?(:on_message_complete) && message_complete?
   end
 
   private
 
-  def no_body?
-    (@headers['content-length'].nil? && @headers['content-encoding'].nil?)
+  def message_complete?
+    @body_complete || (@headers_complete && @headers['content-length'].nil? && @headers['transfer-encoding'].nil?)
   end
 
   def read data, size = nil
@@ -134,6 +133,10 @@ class Segregate
       parse_request_line line
     elsif line =~ STATUS_LINE
       parse_status_line line
+    elsif line =~ UNKNOWN_REQUEST_LINE
+      raise "ERROR: Unknown http method: %s" % line[/^\S+/]
+    else
+      raise "ERROR: Unknown first line: %s" % line
     end
 
     @first_line_complete = true
@@ -175,7 +178,7 @@ class Segregate
   def read_body data
     if headers.key? 'content-length'
       parse_body data
-    elsif headers['content-encoding'] == 'chunked'
+    elsif headers['transfer-encoding'] == 'chunked'
       parse_chunked_data data
     end
   end
@@ -188,7 +191,7 @@ class Segregate
 
   def parse_chunked_data data
     while !data.eof? && !@body_complete
-      chunk_size = read(data).to_i
+      chunk_size = read(data).to_i(16)
       if chunk_size == 0
         @body_complete = true
       else

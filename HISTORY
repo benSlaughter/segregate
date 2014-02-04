@@ -1,5 +1,18 @@
 # History
 ## Released Versions
+### Version 0.4.0
+#### Minor: Raw data
+##### Added
+ * on_message_complete callback
+ * raw_data request with no body
+ * message_complete? method
+
+##### Updated
+ * cleaned up tests
+
+##### Removed
+ * Errors raised when body is not complete
+
 ### Version 0.3.0
 #### Minor: Raw data
 ##### Added

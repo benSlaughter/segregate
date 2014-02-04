@@ -38,6 +38,14 @@ describe Segregate do
       it 'accepts one argument' do
         expect(@parser).to respond_to(:parse).with(1).argument
       end
+
+      it 'errors if an incorrect first line is received' do
+        expect{ @parser.parse "fail\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown first line: fail'
+      end
+
+      it 'errors if an incorrect http method is received' do
+        expect{ @parser.parse "FAIL /endpoint HTTP/1.1\r\n" }.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
+      end
     end
 
     context 'a request line has been parsed' do
@@ -175,6 +183,10 @@ describe Segregate do
         it 'returns the uri methods' do
           expect(@parser.path).to eq '/endpoint'
         end
+
+        it 'raises an error if uri does not respond to the method' do
+          expect{ @parser.not_present }.to raise_error NoMethodError, /undefined method `not_present'/
+        end
       end
 
       describe '#respond_to?' do
@@ -307,8 +319,7 @@ describe Segregate do
 
     context 'a header has been parsed' do
       before(:each) do
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Accept: application/json\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nAccept: application/json\r\n"
       end
 
       describe '#headers' do
@@ -331,10 +342,7 @@ describe Segregate do
 
     context 'all headers have been parsed' do
       before(:each) do
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Accept: application/json\r\n"
-        @parser.parse "Host: www.google.com\r\n"
-        @parser.parse "\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nAccept: application/json\r\nHost: www.google.com\r\n\r\n"
       end
 
       describe '#headers' do
@@ -365,10 +373,7 @@ describe Segregate do
 
     context 'a body has been parsed' do
       before(:each) do
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Host: www.google.com\r\n"
-        @parser.parse "Content-Length: 20\r\n"
-        @parser.parse "\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nHost: www.google.com\r\nContent-Length: 20\r\n\r\n"
         @parser.parse "This is the content!\r\n\r\n"
       end
 
@@ -406,11 +411,8 @@ describe Segregate do
 
     context 'a partial chunked body has been parsed' do
       before(:each) do
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Host: www.google.com\r\n"
-        @parser.parse "Content-Encoding: chunked\r\n"
-        @parser.parse "\r\n"
-        @parser.parse "26\r\nThis is the first content!\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nHost: www.google.com\r\nTransfer-Encoding: chunked\r\n\r\n"
+        @parser.parse "1a\r\nThis is the first content!\r\n"
       end
 
       describe '#body' do
@@ -431,8 +433,7 @@ describe Segregate do
 
       context 'the body parsing is completed' do
         before(:each) do
-          @parser.parse "27\r\nThis is the second content!\r\n"
-          @parser.parse "0\r\n\r\n"
+          @parser.parse "1b\r\nThis is the second content!\r\n0\r\n\r\n"
         end
 
         describe '#body' do
@@ -459,11 +460,11 @@ describe Segregate do
         describe '#update_content_length' do
           it 'updates the content lenght header' do
             expect(@parser.headers['content-length']).to be_nil
-            expect(@parser.headers['content-encoding']).to eq 'chunked'
+            expect(@parser.headers['transfer-encoding']).to eq 'chunked'
             @parser.body = 'new content'
             @parser.update_content_length
             expect(@parser.headers['content-length']).to eq '11'
-            expect(@parser.headers['content-encoding']).to be_nil
+            expect(@parser.headers['transfer-encoding']).to be_nil
           end
         end
 
@@ -506,16 +507,14 @@ describe Segregate do
     describe 'on_headers_complete' do
       it 'calls the callback object' do
         @callback_object.should_receive(:on_headers_complete).with(@parser)
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Host: www.google.com\r\n\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nHost: www.google.com\r\n\r\n"
       end
     end
 
     describe 'on_body' do
       it 'calls the callback object' do
         @callback_object.should_receive(:on_body).with("TestData")
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Content-Length: 8\r\n\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nContent-Length: 8\r\n\r\n"
         @parser.parse "TestData\r\n\r\n"
       end
     end
@@ -523,15 +522,13 @@ describe Segregate do
     describe 'on_message_complete' do
       it 'calls the callback object with a body' do
         @callback_object.should_receive(:on_message_complete).with(@parser)
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "Content-Length: 8\r\n\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nContent-Length: 8\r\n\r\n"
         @parser.parse "TestData\r\n\r\n"
       end
 
       it 'calls the callback object without a body' do
         @callback_object.should_receive(:on_message_complete).with(@parser)
-        @parser.parse "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse "host: www.google.com\r\n\r\n"
+        @parser.parse "GET /endpoint HTTP/1.1\r\nhost: www.google.com\r\n\r\n"
       end
     end
   end
