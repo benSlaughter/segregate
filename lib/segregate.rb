@@ -97,8 +97,9 @@ class Segregate
     @header_orders.each do |header|
       raw_message << "%s: %s\r\n" % [header, headers[header]]
     end
+    raw_message << "\r\n"
 
-    raw_message << "\r\n" + @body + "\r\n\r\n"
+    raw_message << @body + "\r\n\r\n" unless @body.empty?
   end
 
   def parse data
@@ -107,9 +108,15 @@ class Segregate
     read_first_line data unless @first_line_complete
     read_headers data unless @headers_complete
     read_body data unless data.eof?
+
+    @callback.on_message_complete self if @callback.respond_to?(:on_message_complete) && @headers_complete && (no_body? || @body_complete)
   end
 
   private
+
+  def no_body?
+    (@headers['content-length'].nil? && @headers['content-encoding'].nil?)
+  end
 
   def read data, size = nil
     if size
@@ -171,8 +178,6 @@ class Segregate
     elsif headers['content-encoding'] == 'chunked'
       parse_chunked_data data
     end
-
-    @callback.on_body_complete self if @callback.respond_to?(:on_body_complete) && @body_complete
   end
 
   def parse_body data

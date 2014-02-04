@@ -520,12 +520,18 @@ describe Segregate do
       end
     end
 
-    describe 'on_body_complete' do
-      it 'calls the callback object' do
-        @callback_object.should_receive(:on_body_complete).with(@parser)
+    describe 'on_message_complete' do
+      it 'calls the callback object with a body' do
+        @callback_object.should_receive(:on_message_complete).with(@parser)
         @parser.parse "GET /endpoint HTTP/1.1\r\n"
         @parser.parse "Content-Length: 8\r\n\r\n"
         @parser.parse "TestData\r\n\r\n"
+      end
+
+      it 'calls the callback object without a body' do
+        @callback_object.should_receive(:on_message_complete).with(@parser)
+        @parser.parse "GET /endpoint HTTP/1.1\r\n"
+        @parser.parse "host: www.google.com\r\n\r\n"
       end
     end
   end
