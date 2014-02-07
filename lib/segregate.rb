@@ -22,7 +22,7 @@ class Segregate
     @uri.respond_to?(meth, include_private) || super
   end
 
-  def initialize callback = nil 
+  def initialize callback = nil
     @callback = callback
     @http_version = [nil, nil]
 
@@ -35,6 +35,8 @@ class Segregate
 
     @stashed_data = ""
     @stashed_body = ""
+
+    @header_order = []
   end
 
   def request?
@@ -83,22 +85,44 @@ class Segregate
 
   def update_content_length
     unless @body.empty?
-      @headers['content-length'] = @body.size.to_s
-      @headers.delete 'transfer-encoding' 
+      if @body.length > 99999999999
+        @headers['transfer-encoding'] = 'chunked'
+        @headers.delete 'content-length'
+      else
+        @headers['content-length'] = @body.length.to_s
+        @headers.delete 'transfer-encoding'
+      end
     end
   end
 
   def raw_data
     raw_message = ""
     update_content_length
-    
-    request? ? raw_message << request_line + "\r\n" : raw_message << status_line + "\r\n"
-    ALL_HEADERS.each do |header|
-      raw_message << "%s: %s\r\n" % [header, headers[header]] if headers[header]
-    end
 
-    raw_message << "\r\n" + @body + "\r\n" unless @body.empty?
+    build_headers raw_message
+    build_body raw_message
+
+    return raw_message
+  end
+
+  def build_headers raw_message
+    request? ? raw_message << request_line + "\r\n" : raw_message << status_line + "\r\n"
+    @header_order.each do |header|
+      raw_message << "%s: %s\r\n" % [header, headers[header.downcase]]
+    end
     raw_message << "\r\n"
+  end
+
+  def build_body raw_message
+    if @headers['content-length']
+      raw_message << @body
+    elsif @headers['transfer-encoding'] == 'chunked'
+      @body.scan(/.{1,65535}/).each do |chunk|
+        raw_message << "%s\r\n" % chunk.length.to_s(16)
+        raw_message << chunk + "\r\n"
+      end
+      raw_message << "0\r\n\r\n"
+    end
   end
 
   def parse_data data
@@ -109,6 +133,8 @@ class Segregate
       line, complete_line = get_next_line data
       complete_line ? parse_line(line) : @stashed_data = line
     end
+
+    data.close
   end
 
   def parse_line line
@@ -127,8 +153,17 @@ class Segregate
   private
 
   def get_next_line data
-    line = data.readline("\r\n")
-    [line.chomp("\r\n"), line.end_with?("\r\n") || line.length == headers['content-length'].to_i && @state >= :body]
+    if @headers['content-length'] && @state >= :body
+      line = data.readline("\r\n")
+      @inital_line = line
+      [line, true]
+    else
+      line = data.readline("\r\n")
+      @inital_line = line
+      result = line.end_with?("\r\n")
+      line = line[0..-3] if result
+      [line, result]
+    end
   end
 
   def read_in_first_line line
@@ -169,8 +204,9 @@ class Segregate
     if line.empty?
       @state.next
     else
-      key, value = line.split(":")
-      @headers[key.downcase] = value.strip
+      key, value = line.split(": ",2)
+      @header_order << key
+      @headers[key.downcase] = value
     end
 
     if headers_complete?
@@ -193,7 +229,7 @@ class Segregate
     line = @stashed_body + line
     @stashed_body = ""
 
-    if line.length == headers['content-length'].to_i
+    if line.length >= headers['content-length'].to_i
       @body = line
       @callback.on_body @body if @callback.respond_to?(:on_body)
       @state.next
@@ -226,12 +262,12 @@ class Segregate
     line = @stashed_body + line
     @stashed_body = ""
 
-    if line.length == @chunk_size
+    if line.length >= @chunk_size
       @body << line
       @callback.on_body line if @callback.respond_to?(:on_body)
       @chunked_body_state.next
     else
-      @stashed_body = line
+      @stashed_body = @inital_line.end_with?("\r\n") ? (line + "\r\n") : line
     end
   end
 end
