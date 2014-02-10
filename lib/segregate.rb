@@ -22,7 +22,14 @@ class Segregate
     @uri.respond_to?(meth, include_private) || super
   end
 
-  def initialize callback = nil
+  def debug message
+    if @debug
+      puts "DEBUG: " + message.t_s
+    end
+  end
+
+  def initialize callback = nil, *args, **kwargs
+    @debug = kwargs[:debug] ? true : false
     @callback = callback
     @http_version = [nil, nil]
 
@@ -174,9 +181,9 @@ class Segregate
     elsif line =~ STATUS_LINE
       parse_status_line line
     elsif line =~ UNKNOWN_REQUEST_LINE
-      raise "ERROR: Unknown http method: %s" % line[/^\S+/]
+      debug "Unknown http method: %s" % line[/^\S+/]
     else
-      raise "ERROR: Unknown first line: %s" % line
+      debug "Unknown first line: %s" % line
     end
 
     @state.next
