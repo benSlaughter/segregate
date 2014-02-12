@@ -218,7 +218,7 @@ class Segregate
 
     if headers_complete?
       @callback.on_headers_complete self if @callback.respond_to?(:on_headers_complete)
-      unless headers['content-length'] || headers['transfer-encoding']
+      if headers['transfer-encoding'].nil? && (headers['content-length'] == "0" || headers['content-length'].nil?)
         @state.set :done
       end
     end
