@@ -24,7 +24,7 @@ class Segregate
 
   def debug message
     if @debug
-      puts "DEBUG: " + message.t_s
+      puts "DEBUG: " + message.to_s
     end
   end
 
@@ -92,12 +92,8 @@ class Segregate
 
   def update_content_length
     unless @body.empty?
-      if @body.length > 99999999999
-        @headers['transfer-encoding'] = 'chunked'
-        @headers.delete 'content-length'
-      else
+      if @headers['content-length']
         @headers['content-length'] = @body.length.to_s
-        @headers.delete 'transfer-encoding'
       end
     end
   end
@@ -124,10 +120,8 @@ class Segregate
     if @headers['content-length']
       raw_message << @body
     elsif @headers['transfer-encoding'] == 'chunked'
-      @body.scan(/.{1,65535}/).each do |chunk|
-        raw_message << "%s\r\n" % chunk.length.to_s(16)
-        raw_message << chunk + "\r\n"
-      end
+      raw_message << "%s\r\n" % (@body.size.to_s(16))
+      raw_message << @body + "\r\n"
       raw_message << "0\r\n\r\n"
     end
   end
@@ -180,8 +174,6 @@ class Segregate
       parse_request_line line
     elsif line =~ STATUS_LINE
       parse_status_line line
-    elsif line =~ UNKNOWN_REQUEST_LINE
-      debug "Unknown http method: %s" % line[/^\S+/]
     else
       debug "Unknown first line: %s" % line
     end
