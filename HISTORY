@@ -1,5 +1,13 @@
 # History
 ## Released Versions
+### Version 0.6.0
+#### Minor: parse_data
+##### Added
+
+##### Updated
+
+##### Removed
+
 ### Version 0.5.0
 #### Minor: parse_data
 ##### Added
@@ -42,7 +50,7 @@
 #### Minor: Object callback
 ##### Added
  * Object callback
- 
+
 ### Version 0.1.0
 #### Minor: Inital code
 ##### Added

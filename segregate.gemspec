@@ -24,7 +24,9 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'yard'
   spec.add_development_dependency 'coveralls'
   spec.add_development_dependency 'rspec'
+  spec.add_development_dependency 'pry'
 
   spec.add_runtime_dependency 'hashie'
+  spec.add_runtime_dependency 'lumberjack'
   spec.add_runtime_dependency 'juncture'
 end
