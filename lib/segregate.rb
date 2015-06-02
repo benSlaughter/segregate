@@ -111,7 +111,14 @@ class Segregate
   def build_headers raw_message
     request? ? raw_message << request_line + "\r\n" : raw_message << status_line + "\r\n"
     @header_order.each do |header|
-      raw_message << "%s: %s\r\n" % [header, headers[header.downcase]]
+      values = @headers[header.downcase]
+      if values.kind_of?(Array)
+        values.each do |value|
+          raw_message << "%s: %s\r\n" % [header, value]
+        end
+      else
+        raw_message << "%s: %s\r\n" % [header, values]
+      end
     end
     raw_message << "\r\n"
   end
@@ -204,8 +211,8 @@ class Segregate
       @state.next
     else
       key, value = line.split(": ",2)
-      @header_order << key
-      @headers[key.downcase] = value
+      @header_order << key unless @header_order.include?(key)
+      save_value(@headers, key, value)
     end
 
     if headers_complete?
@@ -267,6 +274,16 @@ class Segregate
       @chunked_body_state.next
     else
       @stashed_body = @inital_line.end_with?("\r\n") ? (line + "\r\n") : line
+    end
+  end
+
+  def save_value(store_hash, key, value)
+    key = key.downcase
+    if store_hash.key?(key)
+      store_hash[key] = [] << store_hash[key] unless store_hash[key].kind_of?(Array)
+      store_hash[key] << value
+    else
+      store_hash[key] = value
     end
   end
 end
