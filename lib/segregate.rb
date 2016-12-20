@@ -127,6 +127,7 @@ class Segregate
     new_body, size = deflate_if_needed(@body)
     if @headers['content-length']
       raw_message << new_body
+      raw_message << "\r\n\r\n"
     elsif @headers['transfer-encoding'] == 'chunked'
       raw_message << "%s\r\n" % (size.to_s(16))
       raw_message << new_body + "\r\n"
@@ -196,7 +197,7 @@ class Segregate
     elsif line =~ STATUS_LINE
       parse_status_line line
     else
-      debug "Unknown first line: %s" % line
+      raise "ERROR: Unknown first line: %s" % line
     end
 
     @state.next
@@ -250,6 +251,8 @@ class Segregate
     @stashed_body = ""
 
     if line.length >= headers['content-length'].to_i
+      # Removing delimiters characters from the HTTP protocol
+      line = line[0..-3]
       @body = inflate_body_if_needed(line)
       @callback.on_body @body if @callback.respond_to?(:on_body)
       @state.next
