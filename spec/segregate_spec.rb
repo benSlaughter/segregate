@@ -23,12 +23,12 @@ describe Segregate do
     end
 
     describe '#parse_data' do
-      it 'raises an error if an incorret fist line is passed' do
+      it 'raises an error if an incorrect fist line is passed' do
         expect{ @parser.parse_data("NOT A HTTP LINE\r\n") }.to raise_error RuntimeError, 'ERROR: Unknown first line: NOT A HTTP LINE'
       end
 
       it 'raises an error if an incorret request method is passed' do
-        expect{ @parser.parse_data("FAIL /endpoint HTTP/1.1\r\n") }.to raise_error RuntimeError, 'ERROR: Unknown http method: FAIL'
+        expect{ @parser.parse_data("FAIL /endpoint HTTP/1.1\r\n") }.to raise_error RuntimeError, 'ERROR: Unknown first line: FAIL /endpoint HTTP/1.1'
       end
 
       it 'can accept partial first lines' do
@@ -48,17 +48,18 @@ describe Segregate do
         @parser.parse_data "GET /endpoint HTTP/1.1\r\n"
         @parser.parse_data "transfer-encoding: chunked\r\n\r\n"
         @parser.parse_data "9\r\n"
-        @parser.parse_data "12345\r\n"
+        @parser.parse_data "12345"
         @parser.parse_data "6789\r\n"
         expect(@parser.body).to eq "123456789"
       end
 
-      it 'can accept partial body' do
+      it 'can accept partial body including CRLF' do
         @parser.parse_data "GET /endpoint HTTP/1.1\r\n"
-        @parser.parse_data "content-length: 9\r\n\r\n"
+        @parser.parse_data "transfer-encoding: chunked\r\n\r\n"
+        @parser.parse_data "B\r\n"
         @parser.parse_data "12345\r\n"
         @parser.parse_data "6789\r\n"
-        expect(@parser.body).to eq "123456789"
+        expect(@parser.body).to eq "12345\r\n6789"
       end
     end
 
@@ -130,25 +131,25 @@ describe Segregate do
 
     describe '#request?' do
       it 'returns false' do
-        expect(@parser.request?).to be_false
+        expect(@parser.request?).to be false
       end
     end
 
     describe '#response?' do
       it 'returns false' do
-        expect(@parser.response?).to be_false
+        expect(@parser.response?).to be false
       end
     end
 
     describe '#headers_complete?' do
       it 'returns false' do
-        expect(@parser.headers_complete?).to be_false
+        expect(@parser.headers_complete?).to be false
       end
     end
 
     describe '#done?' do
       it 'returns false' do
-        expect(@parser.done?).to be_false
+        expect(@parser.done?).to be false
       end
     end
 
@@ -195,11 +196,11 @@ describe Segregate do
 
       describe '#respond_to?' do
         it 'responds to segregate methods' do
-          expect(@parser.respond_to?(:request_line)).to be_true
+          expect(@parser.respond_to?(:request_line)).to be true
         end
 
         it 'responds to uri methods' do
-          expect(@parser.respond_to?(:hostname)).to be_true
+          expect(@parser.respond_to?(:hostname)).to be true
         end
       end
 
@@ -253,25 +254,25 @@ describe Segregate do
 
       describe '#request?' do
         it 'returns false' do
-          expect(@parser.request?).to be_true
+          expect(@parser.request?).to be true
         end
       end
 
       describe '#response?' do
         it 'returns false' do
-          expect(@parser.response?).to be_false
+          expect(@parser.response?).to be false
         end
       end
 
       describe '#headers_complete?' do
         it 'returns false' do
-          expect(@parser.headers_complete?).to be_false
+          expect(@parser.headers_complete?).to be false
         end
       end
 
       describe '#done?' do
         it 'returns false' do
-          expect(@parser.done?).to be_false
+          expect(@parser.done?).to be false
         end
       end
 
@@ -334,13 +335,13 @@ describe Segregate do
 
         describe '#headers_complete?' do
           it 'returns true' do
-            expect(@parser.headers_complete?).to be_true
+            expect(@parser.headers_complete?).to be true
           end
         end
 
         describe '#done?' do
           it 'returns false' do
-            expect(@parser.done?).to be_false
+            expect(@parser.done?).to be false
           end
         end
 
@@ -348,6 +349,7 @@ describe Segregate do
           before(:each) do
             @parser.parse_data "1234567890\r\n"
           end
+
           describe '#state' do
             it 'is in a done state' do
               expect(@parser.state.state).to eq :done
@@ -362,7 +364,7 @@ describe Segregate do
 
           describe '#done?' do
             it 'returns true' do
-              expect(@parser.done?).to be_true
+              expect(@parser.done?).to be true
             end
           end
 
@@ -407,6 +409,18 @@ describe Segregate do
             end
           end
         end
+
+        context 'a body with CRLF has been parsed' do
+          before(:each) do
+            @parser.parse_data "12\r\n567890\r\n"
+          end
+
+          describe '#body' do
+            it 'has the correct data' do
+              expect(@parser.body).to eq "12\r\n567890"
+            end
+          end
+        end
       end
 
       context 'non body headers have been parsed' do
@@ -438,13 +452,13 @@ describe Segregate do
 
         describe '#headers_complete?' do
           it 'returns true' do
-            expect(@parser.headers_complete?).to be_true
+            expect(@parser.headers_complete?).to be true
           end
         end
 
         describe '#done?' do
           it 'returns true' do
-            expect(@parser.done?).to be_true
+            expect(@parser.done?).to be true
           end
         end
       end
@@ -511,25 +525,25 @@ describe Segregate do
 
       describe '#request?' do
         it 'returns false' do
-          expect(@parser.request?).to be_false
+          expect(@parser.request?).to be false
         end
       end
 
       describe '#response?' do
         it 'returns false' do
-          expect(@parser.response?).to be_true
+          expect(@parser.response?).to be true
         end
       end
 
       describe '#headers_complete?' do
         it 'returns false' do
-          expect(@parser.headers_complete?).to be_false
+          expect(@parser.headers_complete?).to be false
         end
       end
 
       describe '#done?' do
         it 'returns false' do
-          expect(@parser.done?).to be_false
+          expect(@parser.done?).to be false
         end
       end
 
@@ -592,13 +606,13 @@ describe Segregate do
 
         describe '#headers_complete?' do
           it 'returns true' do
-            expect(@parser.headers_complete?).to be_true
+            expect(@parser.headers_complete?).to be true
           end
         end
 
         describe '#done?' do
           it 'returns false' do
-            expect(@parser.done?).to be_false
+            expect(@parser.done?).to be false
           end
         end
 
@@ -620,13 +634,13 @@ describe Segregate do
 
           describe '#done?' do
             it 'returns true' do
-              expect(@parser.done?).to be_true
+              expect(@parser.done?).to be true
             end
           end
 
           describe '#raw_data' do
             it 'returns the message in string form' do
-              expect(@parser.raw_data).to eq "HTTP/1.1 200 OK\r\nhost: www.google.com\r\ncontent-length: 9\r\n\r\n123456789\r\n\r\n"
+              expect(@parser.raw_data).to eq "HTTP/1.1 200 OK\r\nhost: www.google.com\r\ntransfer-encoding: chunked\r\n\r\n9\r\n123456789\r\n0\r\n\r\n"
             end
           end
 
@@ -661,7 +675,7 @@ describe Segregate do
           describe '#body=' do
             it 'updates the body' do
               @parser.body = 'this is the body'
-              expect(@parser.raw_data).to eq "HTTP/1.1 200 OK\r\nhost: www.google.com\r\ncontent-length: 16\r\n\r\nthis is the body\r\n\r\n"
+              expect(@parser.raw_data).to eq "HTTP/1.1 200 OK\r\nhost: www.google.com\r\ntransfer-encoding: chunked\r\n\r\n10\r\nthis is the body\r\n0\r\n\r\n"
             end
           end
         end
@@ -696,13 +710,13 @@ describe Segregate do
 
         describe '#headers_complete?' do
           it 'returns true' do
-            expect(@parser.headers_complete?).to be_true
+            expect(@parser.headers_complete?).to be true
           end
         end
 
         describe '#done?' do
           it 'returns true' do
-            expect(@parser.done?).to be_true
+            expect(@parser.done?).to be true
           end
         end
       end

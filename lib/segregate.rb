@@ -124,13 +124,28 @@ class Segregate
   end
 
   def build_body raw_message
+    new_body, size = deflate_if_needed(@body)
     if @headers['content-length']
-      raw_message << @body
+      raw_message << new_body
+      raw_message << "\r\n\r\n"
     elsif @headers['transfer-encoding'] == 'chunked'
-      raw_message << "%s\r\n" % (@body.size.to_s(16))
-      raw_message << @body + "\r\n"
+      raw_message << "%s\r\n" % (size.to_s(16))
+      raw_message << new_body + "\r\n"
       raw_message << "0\r\n\r\n"
     end
+  end
+
+  def deflate_if_needed(body)
+    return [body, body.size] unless gzip_encoded_body?
+
+    str_io = StringIO.new('w')
+    w_gz = Zlib::GzipWriter.new(str_io)
+    w_gz.write(body)
+    w_gz.close
+
+    # To specify the number of bytes for a gzip string
+    # we should check for the buffer size instead of the string size
+    [str_io.string, str_io.size]
   end
 
   def parse_data data
@@ -182,7 +197,7 @@ class Segregate
     elsif line =~ STATUS_LINE
       parse_status_line line
     else
-      debug "Unknown first line: %s" % line
+      raise "ERROR: Unknown first line: %s" % line
     end
 
     @state.next
@@ -236,12 +251,26 @@ class Segregate
     @stashed_body = ""
 
     if line.length >= headers['content-length'].to_i
-      @body = line
+      # Removing delimiters characters from the HTTP protocol
+      line = line[0..-3]
+      @body = inflate_body_if_needed(line)
       @callback.on_body @body if @callback.respond_to?(:on_body)
       @state.next
     else
       @stashed_body = line
     end
+  end
+
+  def inflate_body_if_needed(body)
+    return body unless gzip_encoded_body?
+
+    gzip_str  = StringIO.new(body)
+    gzip_body = Zlib::GzipReader.new( gzip_str )
+    gzip_body.read()
+  end
+
+  def gzip_encoded_body?
+    headers.key?('content-encoding') && headers['content-encoding'].eql?('gzip')
   end
 
   def parse_chunked_data line
@@ -270,6 +299,8 @@ class Segregate
 
     if line.length >= @chunk_size
       @body << line
+      @original_body = @body
+      @body = inflate_body_if_needed(@body)
       @callback.on_body line if @callback.respond_to?(:on_body)
       @chunked_body_state.next
     else
